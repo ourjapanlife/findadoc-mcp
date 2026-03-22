@@ -18,7 +18,7 @@ export default [
                 ...globals.es6,
             },
         },
-        files: ['src/**/*.ts', '__tests__/**/*.ts'],
+        files: ['src/**/*.ts', 'tests/**/*.ts'],
         plugins: { '@typescript-eslint': ts, ts, '@stylistic': stylistic },
         rules: {
             // TS specific rules
