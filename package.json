@@ -29,16 +29,15 @@
     },
     "packageManager": "yarn@4.3.1",
     "dependencies": {
+        "@fastify/rate-limit": "^10.3.0",
         "@modelcontextprotocol/sdk": "^1.0.0",
-        "express": "^5.2.1",
-        "express-rate-limit": "^8.3.1",
+        "fastify": "^5.8.2",
         "graphql": "^16.13.1",
         "graphql-request": "^7.4.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.0.0",
         "@stylistic/eslint-plugin": "^2.0.0",
-        "@types/express": "^5.0.6",
         "@types/node": "^25.5.0",
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",

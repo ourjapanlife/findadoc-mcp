@@ -1,22 +1,16 @@
-import express from 'express'
+import Fastify from 'fastify'
+import rateLimit from '@fastify/rate-limit'
 import { randomUUID } from 'node:crypto'
-import rateLimit from 'express-rate-limit'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { createServer } from './server.js'
 
-const app = express()
+const app = Fastify()
 
-app.use(express.json())
-
-const limiter = rateLimit({
-    windowMs: 900000, // 15 mins
-    limit: 100,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    message: { error: 'Too many requests, please try again later' }
+await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '15 minutes',
+    errorResponseBuilder: () => ({ error: 'Too many requests, please try again later' })
 })
-
-app.use('/mcp', limiter)
 
 const transports: Map<string, StreamableHTTPServerTransport> = new Map()
 
@@ -26,8 +20,8 @@ app.post('/mcp', async (req, res) => {
     if (sessionId && transports.has(sessionId)) {
         const transport = transports.get(sessionId)!
 
-        await transport.handleRequest(req, res, req.body)
-        return
+        await transport.handleRequest(req.raw, res.raw, req.body)
+        return res.hijack()
     }
 
     const transport = new StreamableHTTPServerTransport({
@@ -48,40 +42,45 @@ app.post('/mcp', async (req, res) => {
         transports.set(transport.sessionId, transport)
     }
 
-    await transport.handleRequest(req, res, req.body)
+    await transport.handleRequest(req.raw, res.raw, req.body)
+    return res.hijack()
 })
 
 app.get('/mcp', async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined
 
     if (!sessionId || !transports.has(sessionId)) {
-        res.status(400).json({ error: 'Invalid or missing session ID' })
-        return
+        return res.status(400).send({ error: 'Invalid or missing session ID' })
     }
 
     const transport = transports.get(sessionId)!
 
-    await transport.handleRequest(req, res)
+    await transport.handleRequest(req.raw, res.raw)
+    return res.hijack()
 })
 
 app.delete('/mcp', async (req, res) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined
 
     if (!sessionId || !transports.has(sessionId)) {
-        res.status(400).json({ error: 'Invalid or missing session ID' })
-        return
+        return res.status(400).send({ error: 'Invalid or missing session ID' })
     }
 
     const transport = transports.get(sessionId)!
 
     await transport.close()
     transports.delete(sessionId)
-    res.status(200).end()
+    return res.status(200).send()
 })
 
 const PORT = parseInt(process.env.PORT || '3000', 10)
 
-app.listen(PORT, () => {
+app.listen({ port: PORT, host: '0.0.0.0' }, (err, address) => {
+    if (err) {
+        app.log.error(err)
+        process.exit(1)
+    }
+
     // eslint-disable-next-line no-console
-    console.log(`Find a Doc MCP server listening on http://localhost:${PORT}/mcp`)
+    console.log(`Find a Doc MCP server listening on ${address}/mcp`)
 })

@@ -1,20 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { createServer } from '../src/server.js'
+import { createServer } from '../../src/server.js'
 
-vi.mock('../src/graphql.js', () => ({
+vi.mock('../../src/graphql.js', () => ({
     gqlClient: {
         request: vi.fn()
     }
 }))
 
-describe('findadoc-mcp server', () => {
+describe('healthcheck', () => {
     let client: Client
 
     beforeEach(async () => {
-        vi.clearAllMocks()
-
         const server = createServer()
         const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
 
@@ -24,14 +22,11 @@ describe('findadoc-mcp server', () => {
         await client.connect(clientTransport)
     })
 
-    it('should list available tools', async () => {
-        const result = await client.listTools()
+    it('should return server status', async () => {
+        const result = await client.callTool({ name: 'healthcheck' })
 
-        expect(result.tools).toHaveLength(2)
-
-        const toolNames = result.tools.map((t: { name: string }) => t.name)
-
-        expect(toolNames).toContain('healthcheck')
-        expect(toolNames).toContain('search_healthcare_professionals')
+        expect(result.content).toEqual([
+            { type: 'text', text: 'Find a Doc MCP server is running' }
+        ])
     })
 })
