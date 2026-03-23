@@ -1,4 +1,3 @@
-```typescript
 import listLanguages from './tools/listLanguages';
 import { Tool } from './types';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
@@ -17,4 +16,3 @@ async function main() {
 export default tools;
 
 main()
-```
