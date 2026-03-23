@@ -12,7 +12,7 @@ async function main() {
     const transport = new StdioServerTransport()
 
     await server.connect(transport)
-    export default tools;
 }
+export default tools;
 
 main()
