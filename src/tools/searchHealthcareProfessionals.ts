@@ -1,45 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { gql } from 'graphql-request'
-import { gqlClient } from '../graphql.js'
-
-const SEARCH_HEALTHCARE_PROFESSIONALS = gql`
-    query SearchHealthcareProfessionals($filters: HealthcareProfessionalSearchFilters!) {
-        healthcareProfessionals(filters: $filters) {
-            id
-            names {
-                firstName
-                middleName
-                lastName
-                locale
-            }
-            spokenLanguages
-            degrees
-            specialties
-            acceptedInsurance
-            facilityIds
-        }
-        healthcareProfessionalsTotalCount(filters: $filters)
-    }
-`
-
-interface HealthcareProfessionalsResponse {
-    healthcareProfessionals: Array<{
-        id: string
-        names: Array<{
-            firstName: string
-            middleName: string
-            lastName: string
-            locale: string
-        }>
-        spokenLanguages: string[]
-        degrees: string[]
-        specialties: string[]
-        acceptedInsurance: string[]
-        facilityIds: string[]
-    }>
-    healthcareProfessionalsTotalCount: number
-}
+import { searchHealthcareProfessionals } from '../core/professionals.js'
 
 export function registerSearchHealthcareProfessionals(server: McpServer): void {
     server.registerTool(
@@ -55,31 +16,12 @@ export function registerSearchHealthcareProfessionals(server: McpServer): void {
                 acceptedInsurance: z.array(z.string()).optional().describe('Filter by accepted insurance types (e.g. "JAPANESE_HEALTH_INSURANCE", "INTERNATIONAL_HEALTH_INSURANCE")')
             }
         },
-        async ({ limit, offset, spokenLanguages, specialties, degrees, acceptedInsurance }) => {
+        async params => {
             try {
-                const filters: Record<string, unknown> = {
-                    limit,
-                    offset
-                }
-
-                if (spokenLanguages?.length) { filters.spokenLanguages = spokenLanguages }
-                if (specialties?.length) { filters.specialties = specialties }
-                if (degrees?.length) { filters.degrees = degrees }
-                if (acceptedInsurance?.length) { filters.acceptedInsurance = acceptedInsurance }
-
-                const data = await gqlClient.request<HealthcareProfessionalsResponse>(
-                    SEARCH_HEALTHCARE_PROFESSIONALS,
-                    { filters }
-                )
+                const data = await searchHealthcareProfessionals(params)
 
                 return {
-                    content: [{
-                        type: 'text',
-                        text: JSON.stringify({
-                            totalCount: data.healthcareProfessionalsTotalCount,
-                            results: data.healthcareProfessionals
-                        }, null, 2)
-                    }]
+                    content: [{ type: 'text', text: JSON.stringify(data, null, 2) }]
                 }
             } catch (error) {
                 const message = error instanceof Error ? error.message : 'Unknown error'

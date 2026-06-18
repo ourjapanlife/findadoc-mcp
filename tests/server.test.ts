@@ -27,11 +27,16 @@ describe('findadoc-mcp server', () => {
     it('should list available tools', async () => {
         const result = await client.listTools()
 
-        expect(result.tools).toHaveLength(2)
+        expect(result.tools).toHaveLength(7)
 
         const toolNames = result.tools.map((t: { name: string }) => t.name)
 
         expect(toolNames).toContain('healthcheck')
         expect(toolNames).toContain('search_healthcare_professionals')
+        expect(toolNames).toContain('search_facilities')
+        expect(toolNames).toContain('get_facility')
+        expect(toolNames).toContain('get_healthcare_professional')
+        expect(toolNames).toContain('list_specialties')
+        expect(toolNames).toContain('list_languages')
     })
 })

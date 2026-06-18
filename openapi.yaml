@@ -1,0 +1,381 @@
+openapi: 3.1.0
+info:
+  title: Find a Doc Japan
+  description: >-
+    Use Find a Doc to find healthcare facilities and professionals in Japan that
+    offer services in languages other than Japanese. Find a Doc is a
+    community-maintained directory — not a medical advice service.
+  version: 0.1.0
+  license:
+    name: BSD-3-Clause
+    url: https://opensource.org/license/bsd-3-clause
+servers:
+  - url: https://mcp.findadoc.jp
+    description: Production
+paths:
+  /api/healthcare-professionals:
+    get:
+      operationId: searchHealthcareProfessionals
+      summary: Search healthcare professionals
+      description: >-
+        Search for individual healthcare professionals in Japan by spoken
+        language, medical specialty, degree, or accepted insurance.
+      parameters:
+        - name: limit
+          in: query
+          description: Number of results to return (1-50).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+        - name: offset
+          in: query
+          description: Number of results to skip, for pagination.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: spokenLanguages
+          in: query
+          description: Filter by spoken language codes (e.g. "en_US"). Use /api/languages for valid values.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: specialties
+          in: query
+          description: Filter by medical specialties (e.g. "PEDIATRICS"). Use /api/specialties for valid values.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: degrees
+          in: query
+          description: Filter by degrees (e.g. "MD", "DO", "PhD").
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: acceptedInsurance
+          in: query
+          description: Filter by accepted insurance (e.g. "JAPANESE_HEALTH_INSURANCE").
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: Matching healthcare professionals.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalCount:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HealthcareProfessional'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+  /api/healthcare-professionals/{id}:
+    get:
+      operationId: getHealthcareProfessional
+      summary: Get a healthcare professional by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique ID (UUID) of the healthcare professional.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The healthcare professional.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthcareProfessional'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+  /api/facilities:
+    get:
+      operationId: searchFacilities
+      summary: Search healthcare facilities
+      description: >-
+        Search for clinics and hospitals in Japan. Note: filtering is currently
+        limited to facility name and associated professional name. To find
+        facilities by language or specialty, search healthcare professionals and
+        look up facilities by their facilityIds.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: nameEn
+          in: query
+          description: Filter by English facility name (partial match).
+          schema:
+            type: string
+        - name: nameJa
+          in: query
+          description: Filter by Japanese facility name (partial match).
+          schema:
+            type: string
+        - name: healthcareProfessionalName
+          in: query
+          description: Filter to facilities that have a professional matching this name.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matching facilities.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalCount:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FacilitySummary'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+  /api/facilities/{id}:
+    get:
+      operationId: getFacility
+      summary: Get a facility by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique ID (UUID) of the facility.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The facility.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Facility'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+  /api/specialties:
+    get:
+      operationId: listSpecialties
+      summary: List all medical specialties
+      description: Returns all valid values for the specialties filter.
+      responses:
+        '200':
+          description: All specialties.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  specialties:
+                    type: array
+                    items:
+                      type: string
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+  /api/languages:
+    get:
+      operationId: listLanguages
+      summary: List all spoken languages
+      description: Returns all valid values for the spokenLanguages filter, with human-readable labels.
+      responses:
+        '200':
+          description: All languages.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  languages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code:
+                          type: string
+                        label:
+                          type: string
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+components:
+  responses:
+    NotFound:
+      description: The requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UpstreamError:
+      description: The upstream Find a Doc GraphQL API returned an error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    PersonName:
+      type: object
+      properties:
+        firstName:
+          type: string
+        middleName:
+          type: string
+        lastName:
+          type: string
+        locale:
+          type: string
+    Address:
+      type: object
+      properties:
+        postalCode:
+          type: string
+        prefectureEn:
+          type: string
+        cityEn:
+          type: string
+        addressLine1En:
+          type: string
+        addressLine2En:
+          type: string
+        prefectureJa:
+          type: string
+        cityJa:
+          type: string
+        addressLine1Ja:
+          type: string
+        addressLine2Ja:
+          type: string
+    HealthcareProfessional:
+      type: object
+      properties:
+        id:
+          type: string
+        names:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonName'
+        spokenLanguages:
+          type: array
+          items:
+            type: string
+        degrees:
+          type: array
+          items:
+            type: string
+        specialties:
+          type: array
+          items:
+            type: string
+        acceptedInsurance:
+          type: array
+          items:
+            type: string
+        facilityIds:
+          type: array
+          items:
+            type: string
+        additionalInfoForPatients:
+          type: ['string', 'null']
+    FacilitySummary:
+      type: object
+      properties:
+        id:
+          type: string
+        nameEn:
+          type: string
+        nameJa:
+          type: string
+        contact:
+          type: object
+          properties:
+            phone:
+              type: string
+            website:
+              type: ['string', 'null']
+            address:
+              $ref: '#/components/schemas/Address'
+        healthcareProfessionalIds:
+          type: array
+          items:
+            type: string
+    Facility:
+      type: object
+      properties:
+        id:
+          type: string
+        nameEn:
+          type: string
+        nameJa:
+          type: string
+        contact:
+          type: object
+          properties:
+            phone:
+              type: string
+            email:
+              type: ['string', 'null']
+            website:
+              type: ['string', 'null']
+            googleMapsUrl:
+              type: string
+            address:
+              $ref: '#/components/schemas/Address'
+        mapLatitude:
+          type: number
+        mapLongitude:
+          type: number
+        healthcareProfessionalIds:
+          type: array
+          items:
+            type: string
+        paymentOptions:
+          type: array
+          items:
+            type: object
+            properties:
+              paymentType:
+                type: string
+              paymentBrands:
+                type: ['array', 'null']
+                items:
+                  type: string
