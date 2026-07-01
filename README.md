@@ -6,6 +6,20 @@ MCP (Model Context Protocol) server for [Find a Doc, Japan](https://www.findadoc
 
 This is the MCP server for Find a Doc, providing AI-powered tools for interacting with our healthcare provider data. It exposes findadoc.jp healthcare professionals and facilities data to LLM clients such as Claude and ChatGPT.
 
+## Tools
+
+| Tool | Description |
+|---|---|
+| `search_healthcare_professionals` | Search professionals by spoken language, specialty, degree, or insurance |
+| `search_facilities` | Search clinics and hospitals by name or affiliated professional |
+| `get_facility` | Full details for a single facility by ID |
+| `get_healthcare_professional` | Full details for a single professional by ID |
+| `list_specialties` | All searchable medical specialties (valid `specialties` filter values) |
+| `list_languages` | All supported spoken languages (valid `spokenLanguages` filter values) |
+| `healthcheck` | Confirm the server is running |
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) to add a tool and [docs/testing.md](docs/testing.md) for example calls.
+
 ## Getting Started
 
 ### Prerequisites
@@ -58,6 +72,14 @@ yarn dev:http
 ```
 
 The server listens on `http://localhost:3000/mcp` by default. Set `PORT` in your `.env` to change it.
+
+### REST / OpenAPI (ChatGPT Actions)
+
+The HTTP server also exposes the same tools as REST endpoints under `/api/*`, described by [`openapi.yaml`](openapi.yaml) (served at `/openapi.yaml`). This is for OpenAPI clients such as ChatGPT custom GPTs that use REST Actions rather than MCP. The REST routes are thin wrappers over the same core logic as the MCP tools — see [docs/chatgpt-setup.md](docs/chatgpt-setup.md).
+
+```bash
+curl 'http://localhost:3000/api/specialties'
+```
 
 ### Connecting to an MCP Client
 
@@ -130,7 +152,7 @@ Tools live in `src/tools/` as individual modules. Each tool exports a registrati
 1. Create `src/tools/your-tool.ts`
 2. Export a `registerYourTool(server: McpServer)` function
 3. Call it from `src/server.ts`
-4. Add tests in `__tests__/`
+4. Add tests in `tests/tools/` (and update the tool-count assertion in `tests/server.test.ts`)
 
 ## Architecture Decisions
 

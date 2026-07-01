@@ -3,6 +3,7 @@ import rateLimit from '@fastify/rate-limit'
 import { randomUUID } from 'node:crypto'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { createServer } from './server.js'
+import { registerRestRoutes } from './rest.js'
 
 const app = Fastify()
 
@@ -11,6 +12,10 @@ await app.register(rateLimit, {
     timeWindow: '15 minutes',
     errorResponseBuilder: () => ({ error: 'Too many requests, please try again later' })
 })
+
+// REST + OpenAPI endpoints (for ChatGPT Actions and other OpenAPI clients),
+// served alongside the MCP transport on /mcp.
+await registerRestRoutes(app)
 
 const transports: Map<string, StreamableHTTPServerTransport> = new Map()
 
