@@ -1,0 +1,49 @@
+name: Generate and Commit GQL Types
+
+on:
+  # Run every Monday at midnight (UTC) so the generated types track the schema.
+  schedule:
+    - cron: '0 0 * * MON'
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-gql-types:
+    name: Generating GQL Types 🦾
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      matrix:
+        node-version: [22.12.0]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "yarn"
+      - name: Install Dependencies
+        run: yarn
+      - name: Generate GQL Types
+        run: yarn generate
+
+      # Only opens a PR when `yarn generate` produces a diff.
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update gql types"
+          title: "chore: update gql types"
+          body: "Automated update of the generated GraphQL types from the live schema."
+          branch: "update-gql-types"
+          base: "main"
+          delete-branch: true

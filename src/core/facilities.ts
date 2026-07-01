@@ -1,4 +1,9 @@
 import { gql } from 'graphql-request'
+import type {
+    Contact,
+    Facility as GqlFacility,
+    PhysicalAddress
+} from '../generated/gqlTypes.js'
 import { gqlClient } from '../graphql.js'
 
 // Shared GraphQL logic for facilities. Used by both the MCP tools and the REST
@@ -66,37 +71,26 @@ const GET_FACILITY = gql`
     }
 `
 
-export interface FacilitySummary {
-    id: string
-    nameEn: string
-    nameJa: string
-    contact: {
-        phone: string
-        website: string | null
-        address: Record<string, string | null>
+// Shapes returned by the queries above: the subsets of the generated `Facility`
+// type that each selection set actually requests. Field names and value types
+// stay in sync with the schema via `yarn generate`.
+export type FacilitySummary = Pick<GqlFacility, 'id' | 'nameEn' | 'nameJa' | 'healthcareProfessionalIds'> & {
+    contact: Pick<Contact, 'phone' | 'website'> & {
+        address: Pick<PhysicalAddress, 'postalCode' | 'prefectureEn' | 'cityEn' | 'addressLine1En' | 'addressLine2En'>
     }
-    healthcareProfessionalIds: string[]
 }
 
-export interface Facility {
-    id: string
-    nameEn: string
-    nameJa: string
-    contact: {
-        phone: string
-        email: string | null
-        website: string | null
-        googleMapsUrl: string
-        address: Record<string, string | null>
-    }
-    mapLatitude: number
-    mapLongitude: number
-    healthcareProfessionalIds: string[]
-    paymentOptions: Array<{
-        paymentType: string
-        paymentBrands: string[] | null
-    }>
-}
+export type Facility = Pick<
+    GqlFacility,
+    | 'id'
+    | 'nameEn'
+    | 'nameJa'
+    | 'contact'
+    | 'mapLatitude'
+    | 'mapLongitude'
+    | 'healthcareProfessionalIds'
+    | 'paymentOptions'
+>
 
 export interface SearchFacilitiesParams {
     limit?: number

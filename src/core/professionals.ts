@@ -1,4 +1,5 @@
 import { gql } from 'graphql-request'
+import type { HealthcareProfessional as GqlHealthcareProfessional } from '../generated/gqlTypes.js'
 import { gqlClient } from '../graphql.js'
 
 // Shared GraphQL logic for healthcare professionals. Both the MCP tools
@@ -42,21 +43,19 @@ const GET_HEALTHCARE_PROFESSIONAL = gql`
     ${PROFESSIONAL_FIELDS}
 `
 
-export interface HealthcareProfessional {
-    id: string
-    names: Array<{
-        firstName: string
-        middleName: string
-        lastName: string
-        locale: string
-    }>
-    spokenLanguages: string[]
-    degrees: string[]
-    specialties: string[]
-    acceptedInsurance: string[]
-    facilityIds: string[]
-    additionalInfoForPatients: string | null
-}
+// Shape returned by the queries above: the subset of the generated
+// `HealthcareProfessional` type that our selection set actually requests.
+export type HealthcareProfessional = Pick<
+    GqlHealthcareProfessional,
+    | 'id'
+    | 'names'
+    | 'spokenLanguages'
+    | 'degrees'
+    | 'specialties'
+    | 'acceptedInsurance'
+    | 'facilityIds'
+    | 'additionalInfoForPatients'
+>
 
 export interface SearchProfessionalsParams {
     limit?: number

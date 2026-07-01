@@ -45,6 +45,7 @@ src/
   http.ts         Streamable HTTP entrypoint (mounts /mcp + REST routes)
   server.ts       Builds the McpServer and registers every tool
   graphql.ts      Shared graphql-request client
+  generated/      Types generated from the live GraphQL schema (do not edit)
   core/           GraphQL query logic, shared by MCP tools and REST routes
   tools/          One file per MCP tool (thin adapter over core/)
   rest.ts         REST + OpenAPI routes (ChatGPT Actions), also over core/
@@ -53,9 +54,19 @@ tests/            Vitest tests (mirrors src/, uses InMemoryTransport)
 
 The **GraphQL queries live in `src/core/`** and are called by both the MCP tools and the REST routes — never duplicate a query in a tool or route file.
 
+## GraphQL types (`yarn generate`)
+
+The types in [`src/generated/gqlTypes.ts`](src/generated/gqlTypes.ts) are generated from the live schema with [GraphQL Code Generator](https://the-guild.dev/graphql/codegen) — the same setup as [findadoc-web](https://github.com/ourjapanlife/findadoc-web). **Never edit that file by hand.** Instead, derive your `core/` response types from it (e.g. `Pick<Facility, 'id' | 'nameEn'>`) so field names and enums stay in sync with the schema automatically.
+
+```bash
+yarn generate   # re-fetch the schema from GRAPHQL_ENDPOINT and rewrite src/generated/gqlTypes.ts
+```
+
+A scheduled workflow ([generate-gql-types.yml](.github/workflows/generate-gql-types.yml)) reruns this weekly and opens a PR whenever the upstream schema changes, so the types never drift silently.
+
 ## Adding a tool
 
-1. **Core logic** — add (or reuse) a function in `src/core/` that takes plain params and returns plain data (or throws). Define the `gql` query and a typed response interface here.
+1. **Core logic** — add (or reuse) a function in `src/core/` that takes plain params and returns plain data (or throws). Define the `gql` query here and type its response by picking from the generated schema types (`src/generated/gqlTypes.ts`) rather than hand-writing interfaces — see [GraphQL types](#graphql-types-yarn-generate).
 2. **MCP tool** — create `src/tools/yourTool.ts` exporting `registerYourTool(server: McpServer)`:
    - Validate inputs with `zod` via `inputSchema`.
    - Call the core function.
