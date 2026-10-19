@@ -45,6 +45,34 @@ export type AuditLog = {
   updatedDate: Scalars['String']['output'];
 };
 
+/** A search city owned by one prefecture. The same English slug may exist in two prefectures. */
+export type City = {
+  __typename?: 'City';
+  /** Optional Google place id. Display fields are not stored here. */
+  googlePlaceId?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  /** Six-digit national local-government code. A register refresh matches on this. */
+  localGovernmentCode: Scalars['String']['output'];
+  /** English name with no City or Ward suffix. */
+  nameEn: Scalars['String']['output'];
+  /** Japanese name, keeping 区, 市, 町, or 村. */
+  nameJa: Scalars['String']['output'];
+  prefecture: Prefecture;
+  /** Unique within the prefecture. Tokyo Chuo and Yamanashi Chuo are both chuo. */
+  slug: Scalars['String']['output'];
+};
+
+/** A live Places city suggestion. Only placeId may be stored, and only on the matched city. */
+export type CitySuggestion = {
+  __typename?: 'CitySuggestion';
+  /** Our city when the suggestion maps onto exactly one municipality. */
+  city?: Maybe<City>;
+  /** Live suggestion text. Not a stored field. */
+  label: Scalars['String']['output'];
+  /** Google place id for the suggested city. */
+  placeId: Scalars['String']['output'];
+};
+
 /** Contact information for a facility. */
 export type Contact = {
   __typename?: 'Contact';
@@ -76,8 +104,12 @@ export type ContactInput = {
 
 /** Input for creating a new facility. */
 export type CreateFacilityInput = {
+  /** Id of a city in the vocabulary. Publishing under a city requires this. */
+  cityId?: InputMaybe<Scalars['ID']['input']>;
   /** Contact information for the facility. */
   contact: ContactInput;
+  /** Google place id. Optional, and not a Places payload. */
+  googlePlaceId?: InputMaybe<Scalars['String']['input']>;
   /** IDs of healthcare professionals to associate with this facility. */
   healthcareProfessionalIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   /** Latitude coordinate for map placement. */
@@ -90,6 +122,12 @@ export type CreateFacilityInput = {
   nameJa: Scalars['String']['input'];
   /** Payment options for the facility, Type and Brand */
   paymentOptions?: InputMaybe<Array<PaymentOptionsInput>>;
+  /** Where this facility record came from. */
+  source?: InputMaybe<FacilitySource>;
+  /** Published languages this facility advertises. Does not create a professional. */
+  supportedLanguages?: InputMaybe<Array<Locale>>;
+  /** CONFIRMED requires cityId. Omit this to leave an unresolved facility as UNVERIFIED_LOCATION. */
+  verificationStatus?: InputMaybe<FacilityVerificationStatus>;
 };
 
 /** Input for creating a new healthcare professional. */
@@ -118,8 +156,6 @@ export type CreateReservationInput = {
 
 /** Input for creating a new community submission. */
 export type CreateSubmissionInput = {
-  /** Whether to autofill facility data from the Google Maps URL. */
-  autofillPlaceFromSubmissionUrl?: InputMaybe<Scalars['Boolean']['input']>;
   /** Google Maps URL for the facility. */
   googleMapsUrl?: InputMaybe<Scalars['String']['input']>;
   /** Name of the healthcare professional being submitted. */
@@ -203,10 +239,16 @@ export type DeleteResult = {
 /** A medical facility (hospital, clinic, etc.) registered in the Find a Doc database. */
 export type Facility = {
   __typename?: 'Facility';
+  /** The city record for cityId. Null when the facility has no city. */
+  city?: Maybe<City>;
+  /** City this facility is published under. Null until a city we own is chosen. */
+  cityId?: Maybe<Scalars['ID']['output']>;
   /** Contact information for the facility. */
   contact: Contact;
   /** ISO 8601 timestamp of when this facility was created. */
   createdDate: Scalars['String']['output'];
+  /** Google place id for this facility. Display fields are not stored from Places. */
+  googlePlaceId?: Maybe<Scalars['String']['output']>;
   /** IDs of healthcare professionals associated with this facility. */
   healthcareProfessionalIds: Array<Scalars['ID']['output']>;
   /** Unique identifier for the facility. */
@@ -221,8 +263,27 @@ export type Facility = {
   nameJa: Scalars['String']['output'];
   /** The payment methods accepted by this facility. */
   paymentOptions?: Maybe<Array<PaymentOption>>;
+  /** Where the facility record came from. Null on rows that have not been classified. */
+  source?: Maybe<FacilitySource>;
+  /**
+   * Languages this facility advertises without a named professional.
+   * Only values from the published language list. Storing these does not create a healthcare professional.
+   */
+  supportedLanguages: Array<Locale>;
   /** ISO 8601 timestamp of the last update to this facility. */
   updatedDate: Scalars['String']['output'];
+  /** Whether the location is confirmed. Unresolved rows are UNVERIFIED_LOCATION. */
+  verificationStatus: FacilityVerificationStatus;
+};
+
+/** A live Google place a moderator can confirm. Do not store the name or address from this type. */
+export type FacilityPlaceCandidate = {
+  __typename?: 'FacilityPlaceCandidate';
+  address?: Maybe<Scalars['String']['output']>;
+  category?: Maybe<Scalars['String']['output']>;
+  confidence: PlaceMatchConfidence;
+  name?: Maybe<Scalars['String']['output']>;
+  placeId: Scalars['String']['output'];
 };
 
 /** Search filters for querying facilities. All filters are combined with AND logic. */
@@ -245,9 +306,36 @@ export type FacilitySearchFilters = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   /** Ordering rules for the results. */
   orderBy?: InputMaybe<Array<OrderBy>>;
+  /**
+   * Filter by prefecture. Accepts an English prefecture key (e.g. "Okinawa", case-insensitive)
+   * or the Japanese name (e.g. "沖縄県"). Unknown prefectures are rejected.
+   */
+  prefecture?: InputMaybe<Scalars['String']['input']>;
+  /**
+   * One text query matched against the English name, Japanese name, or id.
+   * Applied before pagination. Blank leaves the list unfiltered.
+   */
+  query?: InputMaybe<Scalars['String']['input']>;
+  /**
+   * Only return facilities with at least one healthcare professional who practices all of these specialties.
+   * Combined with spokenLanguages, the same professional must match both.
+   */
+  specialties?: InputMaybe<Array<Specialty>>;
+  /**
+   * Only return facilities that advertise every one of these languages.
+   * A facility matches when supportedLanguages includes them all, or when one professional speaks them all.
+   * Combined with specialties, the same professional must match both. Facility-level languages do not.
+   */
+  spokenLanguages?: InputMaybe<Array<Locale>>;
   /** Filter by last updated date (ISO 8601). */
   updatedDate?: InputMaybe<Scalars['String']['input']>;
 };
+
+/** Where a facility record came from. */
+export enum FacilitySource {
+  Manual = 'MANUAL',
+  MhlwMultilingualInstitutions = 'MHLW_MULTILINGUAL_INSTITUTIONS'
+}
 
 /** Facility data embedded within a submission. */
 export type FacilitySubmission = {
@@ -268,11 +356,20 @@ export type FacilitySubmission = {
   nameJa?: Maybe<Scalars['String']['output']>;
 };
 
+/** Location check for a facility. UNVERIFIED_LOCATION means there is no cityId. */
+export enum FacilityVerificationStatus {
+  Confirmed = 'CONFIRMED',
+  Unverified = 'UNVERIFIED',
+  UnverifiedLocation = 'UNVERIFIED_LOCATION'
+}
+
 /** A healthcare professional registered in the Find a Doc database. */
 export type HealthcareProfessional = {
   __typename?: 'HealthcareProfessional';
   /** Insurance types accepted by this professional. */
   acceptedInsurance: Array<Insurance>;
+  /** Credentials other than the clinical license, such as PhD or MPH. */
+  additionalCredentials: Array<Degree>;
   /** Free-text notes or instructions for patients. */
   additionalInfoForPatients?: Maybe<Scalars['String']['output']>;
   /** ISO 8601 timestamp of when this record was created. */
@@ -283,8 +380,14 @@ export type HealthcareProfessional = {
   facilityIds: Array<Scalars['ID']['output']>;
   /** Unique identifier for the healthcare professional. */
   id: Scalars['ID']['output'];
+  /** Suggestion for a dual license. A moderator decides whether to apply it. */
+  licenseRecommendation?: Maybe<Scalars['String']['output']>;
+  /** NEEDS_REVIEW is the moderator queue. CONFIRMED keeps a dual license. */
+  licenseReview?: Maybe<LicenseReviewStatus>;
   /** Localized names of the healthcare professional (e.g. English and Japanese). */
   names: Array<LocalizedName>;
+  /** One clinical license. Empty while a dual license is unresolved or confirmed as dual. */
+  primaryLicense?: Maybe<Degree>;
   /** Medical specialties practiced. */
   specialties: Array<Specialty>;
   /** Languages the healthcare professional speaks. */
@@ -301,8 +404,12 @@ export type HealthcareProfessionalSearchFilters = {
   createdDate?: InputMaybe<Scalars['String']['input']>;
   /** Filter by degrees. */
   degrees?: InputMaybe<Array<Degree>>;
+  /** Filter to professionals linked to at least one of these facility IDs. */
+  facilityIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   /** Filter by specific healthcare professional IDs. */
   ids?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Only professionals in this license queue. NEEDS_REVIEW is the dual-license queue. */
+  licenseReview?: InputMaybe<LicenseReviewStatus>;
   /** Maximum number of results to return. */
   limit?: InputMaybe<Scalars['Int']['input']>;
   /** Filter by localized names. */
@@ -311,6 +418,11 @@ export type HealthcareProfessionalSearchFilters = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   /** Ordering rules for the results. */
   orderBy?: InputMaybe<Array<OrderBy>>;
+  /**
+   * One text query matched against any localized given name, middle name, family name, or id.
+   * Applied before pagination. Blank leaves the list unfiltered.
+   */
+  query?: InputMaybe<Scalars['String']['input']>;
   /** Filter by specialties. */
   specialties?: InputMaybe<Array<Specialty>>;
   /** Filter by spoken languages. */
@@ -352,6 +464,14 @@ export enum Insurance {
   TravelInsurance = 'TRAVEL_INSURANCE',
   /** For patients without insurance coverage. */
   Uninsured = 'UNINSURED'
+}
+
+/** Moderator queue for a professional license. CONFIRMED keeps a dual license. */
+export enum LicenseReviewStatus {
+  /** A moderator confirmed that more than one clinical license should stay. */
+  Confirmed = 'CONFIRMED',
+  /** A moderator still needs to choose the primary license. */
+  NeedsReview = 'NEEDS_REVIEW'
 }
 
 /** Language and region locale codes (BCP 47 style). Used to represent spoken languages. */
@@ -497,16 +617,23 @@ export type LocalizedNameInput = {
   middleName?: InputMaybe<Scalars['String']['input']>;
 };
 
-/** Input for autofilling a submission from a Google Maps URL during moderation. */
-export type ModerationAutofillDatabaseSubmissionInput = {
-  /** Google Maps URL to extract facility data from. */
-  googleMapsUrl?: InputMaybe<Scalars['String']['input']>;
-  /** ID of the submission to autofill. */
-  id?: InputMaybe<Scalars['String']['input']>;
+/** Live place details for the submit form. Do not store the name, address, or category. */
+export type MapsPlacePreview = {
+  __typename?: 'MapsPlacePreview';
+  address?: Maybe<Scalars['String']['output']>;
+  /** Short place type, such as Medical clinic. */
+  category?: Maybe<Scalars['String']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  placeId?: Maybe<Scalars['String']['output']>;
 };
 
 export type Mutation = {
   __typename?: 'Mutation';
+  /**
+   * Store a Google place id a moderator confirmed.
+   * The facility name and address are not changed.
+   */
+  confirmFacilityPlaceId: Facility;
   /** Create a new facility record. */
   createFacility: Facility;
   /** Create a new healthcare professional record. */
@@ -523,8 +650,8 @@ export type Mutation = {
   deleteHealthcareProfessional: DeleteResult;
   /** Delete a submission by ID. */
   deleteSubmission: DeleteResult;
-  /** Autofill a submission with data from a Google Maps URL during the moderation process. */
-  moderationPanelUpdateSubmission: Submission;
+  /** Store a city place id. Does not store a Places name, address, or coordinate. */
+  recordCityPlaceId: City;
   /** Update an existing facility by ID. */
   updateFacility: Facility;
   /** Update an existing healthcare professional by ID. */
@@ -535,6 +662,12 @@ export type Mutation = {
   updateSubmission: Submission;
   /** Update an existing user by ID. */
   updateUser: User;
+};
+
+
+export type MutationConfirmFacilityPlaceIdArgs = {
+  facilityId: Scalars['ID']['input'];
+  placeId: Scalars['String']['input'];
 };
 
 
@@ -578,8 +711,9 @@ export type MutationDeleteSubmissionArgs = {
 };
 
 
-export type MutationModerationPanelUpdateSubmissionArgs = {
-  input: ModerationAutofillDatabaseSubmissionInput;
+export type MutationRecordCityPlaceIdArgs = {
+  cityId: Scalars['ID']['input'];
+  placeId: Scalars['String']['input'];
 };
 
 
@@ -707,10 +841,31 @@ export type PhysicalAddressInput = {
   prefectureJa: Scalars['String']['input'];
 };
 
+export enum PlaceMatchConfidence {
+  High = 'HIGH',
+  Low = 'LOW'
+}
+
+/** A prefecture from the frozen key list. */
+export type Prefecture = {
+  __typename?: 'Prefecture';
+  id: Scalars['ID']['output'];
+  /** English key, for example Tokyo or Hyogo. */
+  nameEn: Scalars['String']['output'];
+  /** Japanese name, including 都, 道, 府, or 県. */
+  nameJa: Scalars['String']['output'];
+  /** Lowercase English key. */
+  slug: Scalars['String']['output'];
+};
+
 export type Query = {
   __typename?: 'Query';
   /** Look up a single audit log entry by its ID. Returns null if not found. */
   auditLog?: Maybe<AuditLog>;
+  /** Every current municipality. Pass a prefecture key or Japanese name to filter. */
+  cities: Array<City>;
+  /** Facilities published under one city. Unresolved locations are excluded. */
+  cityFacilities: Array<Facility>;
   /** Roles and effective API scopes for the authenticated user (always allowed when a user context exists). */
   currentUserAccess: CurrentUserAccess;
   /** Search for facilities matching the given filters. Returns an empty list if no matches. */
@@ -719,12 +874,32 @@ export type Query = {
   facilitiesTotalCount: Scalars['Int']['output'];
   /** Look up a single facility by its unique ID. Returns null if not found. */
   facility?: Maybe<Facility>;
+  /**
+   * The facility that already stores this Google place id.
+   * Null when the id is unknown or we have no matching row.
+   */
+  facilityByGooglePlaceId?: Maybe<Facility>;
+  /**
+   * The clinic this Maps link already is.
+   * A short iPhone link, a place id, and a feature id are the same check.
+   * Null when the link does not match one clinic.
+   */
+  facilityMatchingMapsUrl?: Maybe<Facility>;
   /** Look up a single healthcare professional by their unique ID. Returns null if not found. */
   healthcareProfessional?: Maybe<HealthcareProfessional>;
   /** Search for healthcare professionals matching the given filters. Returns an empty list if no matches. */
   healthcareProfessionals: Array<HealthcareProfessional>;
   /** Get the total count of healthcare professionals matching the given filters. Useful for pagination. */
   healthcareProfessionalsTotalCount: Scalars['Int']['output'];
+  /**
+   * Live name, address, and category for a Maps link on the submit form.
+   * Nothing in this response is saved.
+   */
+  mapsPlacePreview?: Maybe<MapsPlacePreview>;
+  /** Prefectures this server owns. One row per prefecture in the frozen key list. */
+  prefectures: Array<Prefecture>;
+  /** Languages a search facet may offer. This is the published allowlist, not every Locale value. */
+  publishedLanguages: Array<Locale>;
   /** Look up a single reservation by its unique ID. Returns null if not found. */
   reservation?: Maybe<Reservation>;
   /** Look up a single submission by its unique ID. Returns null if not found. */
@@ -733,6 +908,16 @@ export type Query = {
   submissions: Array<Submission>;
   /** Get the total count of submissions matching the given filters. Useful for pagination. */
   submissionsTotalCount: Scalars['Int']['output'];
+  /**
+   * Japan-only city suggestions from Places. The label is live Google text for this screen.
+   * Do not store it. A suggestion with no city is not in our vocabulary.
+   */
+  suggestCities: Array<CitySuggestion>;
+  /**
+   * Live place candidates for a moderator. Nothing in this list is saved.
+   * A coordinate by itself is not a match.
+   */
+  suggestFacilityPlaces: Array<FacilityPlaceCandidate>;
   /** Look up a single user by their unique ID. Returns null if not found. */
   user?: Maybe<User>;
 };
@@ -740,6 +925,17 @@ export type Query = {
 
 export type QueryAuditLogArgs = {
   id?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QueryCitiesArgs = {
+  prefecture?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryCityFacilitiesArgs = {
+  citySlug: Scalars['String']['input'];
+  prefecture: Scalars['String']['input'];
 };
 
 
@@ -758,6 +954,16 @@ export type QueryFacilityArgs = {
 };
 
 
+export type QueryFacilityByGooglePlaceIdArgs = {
+  placeId: Scalars['String']['input'];
+};
+
+
+export type QueryFacilityMatchingMapsUrlArgs = {
+  url: Scalars['String']['input'];
+};
+
+
 export type QueryHealthcareProfessionalArgs = {
   id: Scalars['ID']['input'];
 };
@@ -770,6 +976,12 @@ export type QueryHealthcareProfessionalsArgs = {
 
 export type QueryHealthcareProfessionalsTotalCountArgs = {
   filters: HealthcareProfessionalSearchFilters;
+};
+
+
+export type QueryMapsPlacePreviewArgs = {
+  languageCode?: InputMaybe<Scalars['String']['input']>;
+  url: Scalars['String']['input'];
 };
 
 
@@ -790,6 +1002,22 @@ export type QuerySubmissionsArgs = {
 
 export type QuerySubmissionsTotalCountArgs = {
   filters: SubmissionSearchFilters;
+};
+
+
+export type QuerySuggestCitiesArgs = {
+  input: Scalars['String']['input'];
+};
+
+
+export type QuerySuggestFacilityPlacesArgs = {
+  address?: InputMaybe<Scalars['String']['input']>;
+  languageCode?: InputMaybe<Scalars['String']['input']>;
+  latitude?: InputMaybe<Scalars['Float']['input']>;
+  longitude?: InputMaybe<Scalars['Float']['input']>;
+  nameEn?: InputMaybe<Scalars['String']['input']>;
+  nameJa?: InputMaybe<Scalars['String']['input']>;
+  url?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -953,8 +1181,6 @@ export enum SpecialtyCategory {
 /** A community-submitted suggestion for adding or updating a healthcare professional or facility. */
 export type Submission = {
   __typename?: 'Submission';
-  /** Whether to autofill facility data from the Google Maps URL. */
-  autofillPlaceFromSubmissionUrl?: Maybe<Scalars['Boolean']['output']>;
   /** ISO 8601 timestamp of when this submission was created. */
   createdDate: Scalars['String']['output'];
   /** Facility data included in this submission. */
@@ -1009,8 +1235,12 @@ export type SubmissionSearchFilters = {
 
 /** Input for updating an existing facility. All fields are optional — only provided fields are updated. */
 export type UpdateFacilityInput = {
+  /** Id of a city in the vocabulary. Null clears the city and marks the row unresolved. */
+  cityId?: InputMaybe<Scalars['ID']['input']>;
   /** Updated contact information. */
   contact?: InputMaybe<ContactInput>;
+  /** Google place id. Optional, and not a Places payload. */
+  googlePlaceId?: InputMaybe<Scalars['String']['input']>;
   /** Healthcare professional relationships to add, update, or remove. */
   healthcareProfessionalIds?: InputMaybe<Array<Relationship>>;
   /** Updated latitude coordinate. */
@@ -1023,6 +1253,12 @@ export type UpdateFacilityInput = {
   nameJa?: InputMaybe<Scalars['String']['input']>;
   /** Payment options for the facility, Type and Brand */
   paymentOptions?: InputMaybe<Array<PaymentOptionsInput>>;
+  /** Where this facility record came from. */
+  source?: InputMaybe<FacilitySource>;
+  /** Replacement published language list. An empty list clears it. Does not create a professional. */
+  supportedLanguages?: InputMaybe<Array<Locale>>;
+  /** CONFIRMED requires a cityId on the facility. */
+  verificationStatus?: InputMaybe<FacilityVerificationStatus>;
 };
 
 /** Input for updating an existing healthcare professional. All fields are optional — only provided fields are updated. */
@@ -1035,6 +1271,8 @@ export type UpdateHealthcareProfessionalInput = {
   degrees?: InputMaybe<Array<Degree>>;
   /** Facility relationships to add, update, or remove. */
   facilityIds?: InputMaybe<Array<Relationship>>;
+  /** CONFIRMED keeps a dual license. Omit this to classify the degrees you send. */
+  licenseReview?: InputMaybe<LicenseReviewStatus>;
   /** Updated localized names. */
   names?: InputMaybe<Array<LocalizedNameInput>>;
   /** Updated specialties. */
@@ -1053,8 +1291,6 @@ export type UpdateReservationInput = {
 
 /** Input for updating an existing submission. Used during the moderation review process. */
 export type UpdateSubmissionInput = {
-  /** Whether to autofill facility data from the Google Maps URL. */
-  autofillPlaceFromSubmissionUrl?: InputMaybe<Scalars['Boolean']['input']>;
   /** Facility data to associate with this submission. */
   facility?: InputMaybe<CreateFacilityInput>;
   /** Updated Google Maps URL. */
